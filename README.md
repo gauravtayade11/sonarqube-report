@@ -1,6 +1,6 @@
 # SonarQube Report Generator
 
-> A shell script that generates **per-team HTML security & quality reports** from SonarQube — no extra tooling, no plugins, just `curl` and `sh`.
+> A shell script that generates a self-contained HTML security & quality report from SonarQube — no extra tooling, no plugins, just `curl` and `sh`.
 
 ![Phase](https://img.shields.io/badge/Phase-1%20Manual%20Generation-blue)
 ![Shell](https://img.shields.io/badge/Shell-POSIX%20sh-lightgrey)
@@ -10,9 +10,9 @@
 
 ## What it does
 
-DevOps or Security teams need to answer on demand: *"Which teams still have Blocker/High/Security issues open?"*
+DevOps or Security teams need to answer on demand: *"Which projects still have Blocker/High/Security issues open?"*
 
-This script hits the SonarQube REST API and produces a **self-contained HTML report per team** showing:
+This script hits the SonarQube REST API, **auto-discovers all projects**, and produces a single self-contained HTML report showing:
 
 | Column | What it measures |
 |---|---|
@@ -24,7 +24,7 @@ This script hits the SonarQube REST API and produces a **self-contained HTML rep
 | Reliability | Reliability issues at HIGH/MEDIUM level |
 | Gate Status | Quality Gate result (PASSED / FAILED / WARNING) |
 
-Summary cards at the top give a quick team-level view. Each project links directly to its SonarQube dashboard. Only the table rows scroll — the header stays fixed.
+Summary cards at the top give an overall view. Each project links directly to its SonarQube dashboard. Only the table rows scroll — the header stays fixed.
 
 **Sample output:**
 
@@ -35,13 +35,13 @@ Summary cards at the top give a quick team-level view. Each project links direct
 ## Project Structure
 
 ```
-sonarqube-weekly-report/
+sonarqube-report/
 ├── scripts/
-│   └── sonar-report.sh   # API calls, data aggregation, report generation
+│   └── sonar-report.sh          # API calls, data aggregation, report generation
 ├── templates/
 │   └── report.html              # HTML/CSS template with {{PLACEHOLDERS}}
 ├── examples/
-│   └── teams.conf.example       # Multi-team configuration example
+│   └── teams.conf.example       # Configuration example
 └── docs/
     ├── sample-report.html       # Preview the report in a browser
     └── assets/
@@ -77,7 +77,7 @@ sonarqube-weekly-report/
 ### 1. Clone the repo
 
 ```sh
-git clone https://github.com/your-org/sonarqube-report.git
+git clone https://github.com/gauravtayade11/sonarqube-report.git
 cd sonarqube-report
 ```
 
@@ -88,18 +88,11 @@ Open `scripts/sonar-report.sh` and update the top section:
 ```sh
 SONAR_HOST_URL="https://sonarqube.yourcompany.com"   # your SonarQube URL
 SONAR_ADMIN_TOKEN="sqp_xxxxxxxxxxxx"                 # your token
-
-TEAMS="
-frontend
-backend
-platform
-"
+REPORT_NAME="platform"                               # used as report heading and filename
 ```
 
 > **Token tip:** Generate at *SonarQube → My Account → Security → Tokens*.
 > Use type **User Token** with Browse permission, or a **Global Analysis Token** if you have Global Admin.
-
-See [examples/teams.conf.example](examples/teams.conf.example) for a multi-team example.
 
 ### 3. Run the script
 
@@ -110,27 +103,26 @@ sh scripts/sonar-report.sh
 Expected output:
 
 ```
-[INFO]    Generating report for team: frontend
+[INFO]    Discovering all projects from SonarQube...
 [INFO]      Processing: frontend-web
-[INFO]      Processing: frontend-mobile
-[SUCCESS] Report saved: sonarqube-report-frontend-2026-03-27.html
-[INFO]    Generating report for team: backend
+[INFO]      Processing: auth-service
+[INFO]      Processing: payments-api
 ...
 ============================================================
-  ALL TEAM REPORTS GENERATED
-  Date: 2026-03-27
-  Reports saved as: sonarqube-report-[team]-2026-03-27.html
+  REPORT GENERATED
+  Date   : 2026-03-27
+  Report : sonarqube-report-platform-2026-03-27.html
 ============================================================
 ```
 
-### 4. Share the reports
+### 4. Share the report
 
-Open the generated `.html` files in any browser — fully self-contained, no external CSS/JS dependencies.
+Open the generated `.html` file in any browser — fully self-contained, no external CSS/JS dependencies.
 
 Options for sharing:
 - Email as attachment
 - Upload to S3 / GCS bucket with a public/signed URL
-- Commit to a `reports/` branch and share GitHub Pages link
+- Commit to a `reports/` branch and share via GitHub Pages
 - Upload to Confluence as an attachment
 - Post in a Slack message
 
@@ -138,18 +130,15 @@ Options for sharing:
 
 ## Configuration Reference
 
-### TEAMS format
+### REPORT_NAME
 
-```
-TEAMS="
-frontend
-backend
-platform
-"
+```sh
+REPORT_NAME="platform"
 ```
 
-- **TEAM_NAME** — used as the report filename (`sonarqube-report-TEAM_NAME-DATE.html`) and header. Use lowercase with hyphens.
-- Projects are **auto-discovered** from SonarQube using the team name as a search prefix — no need to list project keys manually.
+- Used as the report heading and output filename: `sonarqube-report-platform-2026-03-27.html`
+- Use lowercase letters, numbers, and hyphens only
+- All projects are **auto-discovered** from SonarQube — no need to list project keys manually
 
 ### Environment variable override (optional)
 
@@ -168,16 +157,18 @@ Edit `templates/report.html` directly — it uses `{{PLACEHOLDER}}` tokens that 
 
 ## How it works
 
-The script uses four SonarQube REST API endpoints:
+1. Fetches all projects from SonarQube using `/api/projects/search?ps=500`
+2. For each project, queries three endpoints:
 
 ```
 GET /api/issues/search               — issue counts by severity/type
 GET /api/hotspots/search             — security hotspot counts
 GET /api/qualitygates/project_status — quality gate result
-GET /api/projects/search             — resolve project display name
 ```
 
-It then fills `templates/report.html` using `awk`, replacing `{{PLACEHOLDER}}` tokens with live data and streaming the per-project table rows in. No SonarQube plugins or server-side configuration required.
+3. Fills `templates/report.html` using `awk`, replacing `{{PLACEHOLDER}}` tokens with live data
+
+No SonarQube plugins or server-side configuration required.
 
 ---
 
@@ -185,20 +176,21 @@ It then fills `templates/report.html` using `awk`, replacing `{{PLACEHOLDER}}` t
 
 **All counts show 0**
 - Check that `SONAR_ADMIN_TOKEN` is correct and not expired
-- Verify network connectivity: `curl -u "$SONAR_ADMIN_TOKEN:" "$SONAR_HOST_URL/api/system/status"`
+- Verify connectivity: `curl -u "$SONAR_ADMIN_TOKEN:" "$SONAR_HOST_URL/api/system/status"`
+
+**No projects found**
+- Token may lack Browse permission — try a Global Admin token
+- Verify `SONAR_HOST_URL` has no trailing slash
 
 **`UNKNOWN` quality gate**
-- The project key doesn't exist or the token lacks Browse permission on that project
-
-**Special characters in team names break the filename**
-- Use only lowercase letters, numbers, and hyphens in `TEAM_NAME`
+- Token lacks Browse permission on that specific project
 
 ---
 
 ## Contributing
 
 1. Fork the repo
-2. Create a branch: `git checkout -b feature/phase-2-cron`
+2. Create a branch: `git checkout -b feature/your-feature`
 3. Commit your changes
 4. Open a pull request
 
@@ -210,4 +202,4 @@ MIT — see [LICENSE](LICENSE)
 
 ---
 
-*Built by the DevOps Platform Team. Feedback and PRs welcome.*
+*Feedback and PRs welcome — [github.com/gauravtayade11/sonarqube-report](https://github.com/gauravtayade11/sonarqube-report)*

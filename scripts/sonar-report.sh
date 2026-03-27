@@ -5,7 +5,7 @@
 #               security and quality issues
 # Usage       : sh sonar-report.sh
 # Output      : sonarqube-report-[team]-[date].html
-# Repo        : https://github.com/your-org/sonarqube-report
+# Repo        : https://github.com/gauravtayade11/sonarqube-report
 # ============================================================
 
 SCRIPT_DIR=$(dirname "$0")

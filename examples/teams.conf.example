@@ -1,7 +1,6 @@
 # ============================================================
 # teams.conf.example
-# Copy this file to teams.conf and edit to match your setup.
-# Then source it in sonar-weekly-report.sh or pass as env var.
+# Copy values into scripts/sonar-report.sh to configure.
 # ============================================================
 
 # SonarQube server URL (no trailing slash)
@@ -11,15 +10,9 @@ SONAR_HOST_URL="https://sonarqube.yourcompany.com"
 # Required permissions: Browse (all projects) or Global Admin
 SONAR_ADMIN_TOKEN="sqp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 
-# ── Team → Project Key Mapping ────────────────────────────────
-# Format: "TEAM_NAME|PROJECT_KEY1,PROJECT_KEY2,PROJECT_KEY3"
-# TEAM_NAME  : used in the output filename and report header
-# PROJECT_KEY: must match the key in SonarQube exactly (case-sensitive)
-#
-# Example:
-TEAMS="
-frontend|frontend-web,frontend-mobile,design-system
-backend|auth-service,payments-api,notification-service
-platform|infra-core,ci-platform,k8s-operator
-data|etl-pipeline,data-warehouse,analytics-api
-"
+# Report name — used as the report heading and output filename
+# Output: sonarqube-report-REPORT_NAME-DATE.html
+# Use lowercase letters, numbers, and hyphens only
+REPORT_NAME="platform"
+
+# All projects are auto-discovered from SonarQube — no project keys needed.
